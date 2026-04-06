@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Application Reminder</title>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f5f5f5;
+      color: #1a1a1a;
+    }
+    .wrapper {
+      max-width: 560px;
+      margin: 40px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #e5e5e5;
+    }
+    .header {
+      background-color: #1a1a1a;
+      padding: 28px 32px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 500;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+    }
+    .badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background-color: {% if reminder_type == 'interview_prep' %}#d4f1e4{% elif reminder_type == 'deadline' %}#fde8e8{% elif reminder_type == 'follow_up' %}#e8f0fd{% else %}#f0f0f0{% endif %};
+      color: {% if reminder_type == 'interview_prep' %}#166534{% elif reminder_type == 'deadline' %}#991b1b{% elif reminder_type == 'follow_up' %}#1e40af{% else %}#555{% endif %};
+    }
+    .body {
+      padding: 32px;
+    }
+    .greeting {
+      font-size: 15px;
+      margin: 0 0 20px;
+      color: #444;
+    }
+    .card {
+      background: #f9f9f9;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .card .role {
+      font-size: 17px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin: 0 0 4px;
+    }
+    .card .company {
+      font-size: 14px;
+      color: #666;
+      margin: 0 0 12px;
+    }
+    .meta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      font-size: 12px;
+      color: #888;
+    }
+    .meta-item strong {
+      color: #444;
+      font-weight: 500;
+    }
+    .message-box {
+      background: #fff8e1;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 4px 4px 0;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #444;
+      line-height: 1.6;
+    }
+    .cta {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .cta a {
+      display: inline-block;
+      padding: 12px 28px;
+      background-color: #1a1a1a;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .footer {
+      border-top: 1px solid #e5e5e5;
+      padding: 20px 32px;
+      font-size: 12px;
+      color: #999;
+      line-height: 1.6;
+    }
+    .footer a { color: #999; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <div class="header">
+      <h1>Job Application Reminder</h1>
+      <span class="badge">{{ reminder_type_display }}</span>
+    </div>
+
+    <div class="body">
+
+      <p class="greeting">Hi {{ user_first_name }},</p>
+
+      <p style="font-size:14px;color:#555;margin:0 0 20px;line-height:1.6;">
+        This is your scheduled reminder for the following application:
+      </p>
+
+      <div class="card">
+        <p class="role">{{ job_title }}</p>
+        <p class="company">{{ company_name }}</p>
+        <div class="meta">
+          <span class="meta-item"><strong>Status:</strong> {{ application_status }}</span>
+          {% if application_location %}
+          <span class="meta-item"><strong>Location:</strong> {{ application_location }}</span>
+          {% endif %}
+          {% if applied_date %}
+          <span class="meta-item"><strong>Applied:</strong> {{ applied_date }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if message %}
+      <div class="message-box">
+        <strong style="display:block;margin-bottom:6px;font-size:12px;text-transform:uppercase;letter-spacing:0.4px;color:#b45309;">Your note</strong>
+        {{ message }}
+      </div>
+      {% endif %}
+
+      <div class="cta">
+        <a href="{{ application_url }}">View Application</a>
+      </div>
+
+      <p style="font-size:13px;color:#888;margin:0;line-height:1.6;">
+        Keep going — consistent follow-through is what separates a good candidate
+        from a great one. Good luck!
+      </p>
+
+    </div>
+
+    <div class="footer">
+      You're receiving this because you set a reminder in
+      <a href="{{ frontend_url }}">Job Application Tracker</a>.
+      To manage your reminders, visit your
+      <a href="{{ frontend_url }}/reminders">reminders dashboard</a>.
+    </div>
+
+  </div>
+</body>
+</html>

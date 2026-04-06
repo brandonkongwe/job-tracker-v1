@@ -1,0 +1,5 @@
+-r base.txt 
+
+gunicorn==25.3.0
+django-csp==4.0
+sendgrid==6.12.5

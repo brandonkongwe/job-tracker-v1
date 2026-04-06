@@ -1,0 +1,27 @@
+JOB APPLICATION REMINDER — {{ reminder_type_display|upper }}
+================================================
+
+Hi {{ user_first_name }},
+
+This is your scheduled reminder for the following application:
+
+  Role:     {{ job_title }}
+  Company:  {{ company_name }}
+  Status:   {{ application_status }}
+{% if application_location %}  Location: {{ application_location }}
+{% endif %}{% if applied_date %}  Applied:  {{ applied_date }}
+{% endif %}
+{% if message %}---
+Your note:
+{{ message }}
+---
+{% endif %}
+View your application:
+{{ application_url }}
+
+Keep going — consistent follow-through is what separates a good candidate
+from a great one. Good luck!
+
+--
+Job Application Tracker
+Manage reminders: {{ frontend_url }}/reminders
