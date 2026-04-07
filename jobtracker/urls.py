@@ -26,7 +26,7 @@ api_v1_urlpatterns = [
     path("auth/", include("accounts.urls", namespace="accounts")),
     path("applications/", include("applications.urls", namespace="applications")),
     path("reminders/", include("reminders.urls", namespace="reminders")),
-    # path("analytics/", include("analytics.urls", namespace="analytics")),
+    path("analytics/", include("analytics.urls", namespace="analytics")),
 ]
 
 urlpatterns = [

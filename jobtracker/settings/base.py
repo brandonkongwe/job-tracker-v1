@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     "accounts",
     "applications",
     "reminders",
-    # "analytics",
+    "analytics",
 ]
 
 MIDDLEWARE = [
