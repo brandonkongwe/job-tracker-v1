@@ -39,8 +39,6 @@ htmlcov/
 
 # Docker
 .dockerignore
-Dockerfile
-docker-compose.yml
 
 # macOS
 .DS_Store
