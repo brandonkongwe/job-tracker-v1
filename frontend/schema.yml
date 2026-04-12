@@ -1,0 +1,2336 @@
+openapi: 3.0.3
+info:
+  title: Job Application Tracker API
+  version: 1.0.0
+  description: A RESTful API for tracking job applications, managing CV uploads, setting
+    reminders, and viewing application analytics.
+paths:
+  /api/v1/analytics/dashboard/:
+    get:
+      operationId: v1_analytics_dashboard_retrieve
+      description: Returns all key metrics in a single call. Designed for the main
+        dashboard to avoid multiple round-trips.
+      summary: Main dashboard summary
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+          description: ''
+  /api/v1/analytics/funnel/:
+    get:
+      operationId: v1_analytics_funnel_list
+      description: For each pipeline stage, returns the count and percentage of applications
+        that ever reached that stage (including those that have since moved on or
+        been rejected).
+      summary: Stage conversion funnel
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversionFunnelItem'
+          description: ''
+  /api/v1/analytics/heatmap/:
+    get:
+      operationId: v1_analytics_heatmap_list
+      description: Returns one entry per day for the last 365 days. Days with zero
+        activity are included so the frontend can render a full heatmap grid.
+      summary: Daily application activity (heatmap data)
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HeatmapDay'
+          description: ''
+  /api/v1/analytics/response-rate/:
+    get:
+      operationId: v1_analytics_response_rate_retrieve
+      description: 'response_rate: % of applications that moved past ''applied''.
+        interview_rate: % that reached interview stage. offer_rate: % that received
+        an offer.'
+      summary: Response, interview, and offer rates
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseRate'
+          description: ''
+  /api/v1/analytics/sources/:
+    get:
+      operationId: v1_analytics_sources_list
+      description: Only sources with at least one application are returned, sorted
+        by count descending.
+      summary: Applications by discovery source
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceBreakdownItem'
+          description: ''
+  /api/v1/analytics/stage-duration/:
+    get:
+      operationId: v1_analytics_stage_duration_list
+      description: Computed from StatusHistory entries. Only transitions with at least
+        one data point are returned. sample_size tells you how many transitions the
+        average is based on.
+      summary: Average days between pipeline stages
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StageDurationItem'
+          description: ''
+  /api/v1/analytics/status/:
+    get:
+      operationId: v1_analytics_status_list
+      description: Returns all pipeline statuses with their application count. Zero
+        counts are included.
+      summary: Application count per status
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StatusBreakdownItem'
+          description: ''
+  /api/v1/analytics/top-companies/:
+    get:
+      operationId: v1_analytics_top_companies_list
+      description: |-
+        Shared base for all analytics views.
+        Provides a scoped queryset: own applications for job seekers,
+        all applications for admins.
+        Accepts an optional ?user_id= query param for admins to scope to one user.
+      summary: Most applied-to companies
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+        description: Max companies to return (default 10)
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TopCompany'
+          description: ''
+  /api/v1/analytics/volume/monthly/:
+    get:
+      operationId: v1_analytics_volume_monthly_list
+      description: |-
+        Shared base for all analytics views.
+        Provides a scoped queryset: own applications for job seekers,
+        all applications for admins.
+        Accepts an optional ?user_id= query param for admins to scope to one user.
+      summary: Monthly application volume
+      parameters:
+      - in: query
+        name: months
+        schema:
+          type: integer
+        description: Number of months to include (default 12, max 24)
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyVolumeItem'
+          description: ''
+  /api/v1/analytics/volume/weekly/:
+    get:
+      operationId: v1_analytics_volume_weekly_list
+      description: |-
+        Shared base for all analytics views.
+        Provides a scoped queryset: own applications for job seekers,
+        all applications for admins.
+        Accepts an optional ?user_id= query param for admins to scope to one user.
+      summary: Weekly application volume
+      parameters:
+      - in: query
+        name: weeks
+        schema:
+          type: integer
+        description: Number of weeks to include (default 12, max 52)
+      tags:
+      - analytics
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WeeklyVolumeItem'
+          description: ''
+  /api/v1/applications/:
+    get:
+      operationId: v1_applications_list
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: List job applications
+      parameters:
+      - in: query
+        name: applied_after
+        schema:
+          type: string
+        description: Applied on or after (YYYY-MM-DD)
+      - in: query
+        name: is_active
+        schema:
+          type: string
+        description: true = active only, false = terminal only
+      - in: query
+        name: ordering
+        schema:
+          type: string
+        description: 'Order by: created_at, applied_date, company_name, -created_at
+          …'
+      - in: query
+        name: page
+        schema:
+          type: string
+        description: Page number
+      - in: query
+        name: page_size
+        schema:
+          type: string
+        description: Results per page (max 100)
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search company, title, location, notes
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by status (repeatable)
+      - in: query
+        name: work_mode
+        schema:
+          type: string
+        description: Filter by work mode
+      tags:
+      - applications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedJobApplicationListList'
+          description: ''
+    post:
+      operationId: v1_applications_create
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Create a new application
+      tags:
+      - applications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobApplicationWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JobApplicationWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobApplicationWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationWrite'
+          description: ''
+  /api/v1/applications/{id}/:
+    get:
+      operationId: v1_applications_retrieve
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Retrieve application detail
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - applications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationDetail'
+          description: ''
+    put:
+      operationId: v1_applications_update
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Full update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - applications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobApplicationWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JobApplicationWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobApplicationWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationWrite'
+          description: ''
+    patch:
+      operationId: v1_applications_partial_update
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Partial update (status change, notes, etc.)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - applications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedJobApplicationWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedJobApplicationWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedJobApplicationWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationWrite'
+          description: ''
+    delete:
+      operationId: v1_applications_destroy
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Delete an application
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - applications
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/applications/{id}/documents/:
+    post:
+      operationId: v1_applications_documents_create
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Upload a document (CV, cover letter) to an application
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - applications
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          description: ''
+  /api/v1/applications/{id}/documents/{doc_id}/:
+    delete:
+      operationId: v1_applications_documents_destroy
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Delete a document from an application
+      parameters:
+      - in: path
+        name: doc_id
+        schema:
+          type: string
+          pattern: ^[0-9a-f-]+$
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - applications
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/applications/{id}/history/:
+    get:
+      operationId: v1_applications_history_list
+      description: |-
+        Full CRUD for job applications.
+        Users only ever see and modify their own applications.
+        Admins can see all (scoped in get_queryset).
+      summary: Get status change history for an application
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - applications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStatusHistoryList'
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: v1_auth_login_create
+      description: |-
+        Authenticate with email + password.
+        Returns access token, refresh token, and basic user info.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/logout/:
+    post:
+      operationId: v1_auth_logout_create
+      description: |-
+        Invalidate the provided refresh token by adding it to the blacklist.
+        The access token will expire naturally (short-lived by design).
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh:
+                  type: string
+      security:
+      - jwtAuth: []
+      responses:
+        '205':
+          description: Logout successful — refresh token blacklisted.
+        '400':
+          description: Invalid or missing refresh token.
+  /api/v1/auth/me/:
+    get:
+      operationId: v1_auth_me_retrieve
+      description: |-
+        GET  — return the authenticated user's full profile.
+        PATCH — partial update (preferred for frontend).
+        PUT  — full update.
+        Avatar upload via multipart/form-data.
+      summary: Get own profile
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    put:
+      operationId: v1_auth_me_update
+      description: |-
+        GET  — return the authenticated user's full profile.
+        PATCH — partial update (preferred for frontend).
+        PUT  — full update.
+        Avatar upload via multipart/form-data.
+      summary: Replace own profile
+      tags:
+      - auth
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserProfileRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserProfileRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    patch:
+      operationId: v1_auth_me_partial_update
+      description: |-
+        GET  — return the authenticated user's full profile.
+        PATCH — partial update (preferred for frontend).
+        PUT  — full update.
+        Avatar upload via multipart/form-data.
+      summary: Update own profile
+      tags:
+      - auth
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+  /api/v1/auth/me/password/:
+    post:
+      operationId: v1_auth_me_password_create
+      description: |-
+        Change the authenticated user's password.
+        Requires the current password for verification.
+        After a successful change, all existing tokens remain valid until they expire
+        — consider logging the user out on the frontend after this call.
+      summary: Change own password
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/register/:
+    post:
+      operationId: v1_auth_register_create
+      description: |-
+        Register a new Job Seeker account.
+        No authentication required.
+        Returns the created user profile (no tokens — user must login separately).
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Register'
+          description: ''
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: v1_auth_token_refresh_create
+      description: Refresh an expired access token using a valid refresh token.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/auth/users/:
+    get:
+      operationId: v1_auth_users_list
+      description: |-
+        Returns a paginated list of all users.
+        Restricted to Admin role only.
+      summary: List all users (admin only)
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: role
+        schema:
+          type: string
+          enum:
+          - admin
+          - job_seeker
+        description: |-
+          * `job_seeker` - Job Seeker
+          * `admin` - Admin
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserPublicList'
+          description: ''
+  /api/v1/reminders/:
+    get:
+      operationId: v1_reminders_list
+      description: |-
+        CRUD for reminders.
+        Scoped to the authenticated user's own reminders.
+      summary: List reminders
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - reminders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReminderListList'
+          description: ''
+    post:
+      operationId: v1_reminders_create
+      description: |-
+        CRUD for reminders.
+        Scoped to the authenticated user's own reminders.
+      summary: Create a reminder
+      tags:
+      - reminders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReminderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReminderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReminderWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderWrite'
+          description: ''
+  /api/v1/reminders/{id}/:
+    get:
+      operationId: v1_reminders_retrieve
+      description: |-
+        CRUD for reminders.
+        Scoped to the authenticated user's own reminders.
+      summary: Retrieve a reminder
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - reminders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderDetail'
+          description: ''
+    put:
+      operationId: v1_reminders_update
+      description: |-
+        CRUD for reminders.
+        Scoped to the authenticated user's own reminders.
+      summary: Full update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - reminders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReminderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReminderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReminderWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderWrite'
+          description: ''
+    patch:
+      operationId: v1_reminders_partial_update
+      description: |-
+        CRUD for reminders.
+        Scoped to the authenticated user's own reminders.
+      summary: Partial update (reschedule, cancel)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - reminders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedReminderWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedReminderWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedReminderWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderWrite'
+          description: ''
+    delete:
+      operationId: v1_reminders_destroy
+      description: |-
+        CRUD for reminders.
+        Scoped to the authenticated user's own reminders.
+      summary: Delete a reminder
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - reminders
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/reminders/{id}/cancel/:
+    post:
+      operationId: v1_reminders_cancel_create
+      description: |-
+        Convenience endpoint to deactivate a reminder without deleting it.
+        Useful for frontend 'Cancel reminder' buttons — no request body needed.
+      summary: Cancel a reminder (sets is_active=False)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - reminders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderDetail'
+          description: ''
+components:
+  schemas:
+    BlankEnum:
+      enum:
+      - ''
+    ConversionFunnelItem:
+      type: object
+      properties:
+        stage:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+        rate:
+          type: number
+          format: double
+          description: '% of total applications that reached this stage'
+      required:
+      - count
+      - label
+      - rate
+      - stage
+    CustomTokenObtainPairRequest:
+      type: object
+      description: |-
+        Extends the default JWT login response to include basic user info,
+        so the frontend doesn't need an extra /me call right after login.
+      properties:
+        email:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    DashboardSummary:
+      type: object
+      properties:
+        total_applications:
+          type: integer
+        active_applications:
+          type: integer
+        status_breakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatusBreakdownItem'
+        response_rate:
+          $ref: '#/components/schemas/ResponseRate'
+        weekly_volume:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyVolumeItem'
+        source_breakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceBreakdownItem'
+        conversion_funnel:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversionFunnelItem'
+        top_companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopCompany'
+      required:
+      - active_applications
+      - conversion_funnel
+      - response_rate
+      - source_breakdown
+      - status_breakdown
+      - top_companies
+      - total_applications
+      - weekly_volume
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        document_type:
+          $ref: '#/components/schemas/DocumentTypeEnum'
+        file:
+          type: string
+          format: uri
+        file_url:
+          type: string
+          readOnly: true
+        original_filename:
+          type: string
+          readOnly: true
+        file_size_display:
+          type: string
+          readOnly: true
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - file
+      - file_size_display
+      - file_url
+      - id
+      - original_filename
+      - uploaded_at
+    DocumentRequest:
+      type: object
+      properties:
+        document_type:
+          $ref: '#/components/schemas/DocumentTypeEnum'
+        file:
+          type: string
+          format: binary
+      required:
+      - file
+    DocumentTypeEnum:
+      enum:
+      - cv
+      - cover_letter
+      - other
+      type: string
+      description: |-
+        * `cv` - CV / Resume
+        * `cover_letter` - Cover Letter
+        * `other` - Other
+    HeatmapDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        count:
+          type: integer
+      required:
+      - count
+      - date
+    JobApplicationDetail:
+      type: object
+      description: Full detail view including nested documents and status history.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        company_name:
+          type: string
+          readOnly: true
+        job_title:
+          type: string
+          readOnly: true
+        location:
+          type: string
+          readOnly: true
+        work_mode:
+          allOf:
+          - $ref: '#/components/schemas/WorkModeEnum'
+          readOnly: true
+        work_mode_display:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ToStatusEnum'
+          readOnly: true
+        status_display:
+          type: string
+          readOnly: true
+        salary_range:
+          type: string
+          readOnly: true
+        source:
+          allOf:
+          - $ref: '#/components/schemas/SourceEnum'
+          readOnly: true
+        applied_date:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          title: Date applied
+        interview_date:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Interview date/time
+        document_count:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        job_url:
+          type: string
+          format: uri
+          title: Job posting URL
+          maxLength: 200
+        salary_min:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary min (annual)
+        salary_max:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary max (annual)
+        salary_currency:
+          type: string
+          title: Currency
+          maxLength: 3
+        offer_deadline:
+          type: string
+          format: date
+          nullable: true
+        source_detail:
+          type: string
+          description: E.g. referrer name, recruiter company, specific job board.
+          maxLength: 200
+        notes:
+          type: string
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+          readOnly: true
+        status_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatusHistory'
+          readOnly: true
+      required:
+      - applied_date
+      - company_name
+      - created_at
+      - document_count
+      - documents
+      - id
+      - interview_date
+      - job_title
+      - location
+      - salary_range
+      - source
+      - status
+      - status_display
+      - status_history
+      - updated_at
+      - work_mode
+      - work_mode_display
+    JobApplicationList:
+      type: object
+      description: |-
+        Compact representation for paginated list views.
+        Avoids N+1 by not including nested relations.
+        Status display label included for frontend rendering.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        company_name:
+          type: string
+          readOnly: true
+        job_title:
+          type: string
+          readOnly: true
+        location:
+          type: string
+          readOnly: true
+        work_mode:
+          allOf:
+          - $ref: '#/components/schemas/WorkModeEnum'
+          readOnly: true
+        work_mode_display:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ToStatusEnum'
+          readOnly: true
+        status_display:
+          type: string
+          readOnly: true
+        salary_range:
+          type: string
+          readOnly: true
+        source:
+          allOf:
+          - $ref: '#/components/schemas/SourceEnum'
+          readOnly: true
+        applied_date:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          title: Date applied
+        interview_date:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Interview date/time
+        document_count:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - applied_date
+      - company_name
+      - created_at
+      - document_count
+      - id
+      - interview_date
+      - job_title
+      - location
+      - salary_range
+      - source
+      - status
+      - status_display
+      - updated_at
+      - work_mode
+      - work_mode_display
+    JobApplicationWrite:
+      type: object
+      description: |-
+        Handles creation and updates.
+        On status change, automatically writes a StatusHistory entry.
+        User is injected from request.user — never from the payload.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        company_name:
+          type: string
+          maxLength: 200
+        job_title:
+          type: string
+          maxLength: 200
+        job_url:
+          type: string
+          format: uri
+          title: Job posting URL
+          maxLength: 200
+        location:
+          type: string
+          maxLength: 200
+        work_mode:
+          oneOf:
+          - $ref: '#/components/schemas/WorkModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        status:
+          $ref: '#/components/schemas/ToStatusEnum'
+        salary_min:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary min (annual)
+        salary_max:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary max (annual)
+        salary_currency:
+          type: string
+          title: Currency
+          maxLength: 3
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        source_detail:
+          type: string
+          description: E.g. referrer name, recruiter company, specific job board.
+          maxLength: 200
+        applied_date:
+          type: string
+          format: date
+          nullable: true
+          title: Date applied
+        interview_date:
+          type: string
+          format: date-time
+          nullable: true
+          title: Interview date/time
+        offer_deadline:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+      required:
+      - company_name
+      - id
+      - job_title
+    JobApplicationWriteRequest:
+      type: object
+      description: |-
+        Handles creation and updates.
+        On status change, automatically writes a StatusHistory entry.
+        User is injected from request.user — never from the payload.
+      properties:
+        company_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        job_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        job_url:
+          type: string
+          format: uri
+          title: Job posting URL
+          maxLength: 200
+        location:
+          type: string
+          maxLength: 200
+        work_mode:
+          oneOf:
+          - $ref: '#/components/schemas/WorkModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        status:
+          $ref: '#/components/schemas/ToStatusEnum'
+        salary_min:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary min (annual)
+        salary_max:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary max (annual)
+        salary_currency:
+          type: string
+          minLength: 1
+          title: Currency
+          maxLength: 3
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        source_detail:
+          type: string
+          description: E.g. referrer name, recruiter company, specific job board.
+          maxLength: 200
+        applied_date:
+          type: string
+          format: date
+          nullable: true
+          title: Date applied
+        interview_date:
+          type: string
+          format: date-time
+          nullable: true
+          title: Interview date/time
+        offer_deadline:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+      required:
+      - company_name
+      - job_title
+    MonthlyVolumeItem:
+      type: object
+      properties:
+        month:
+          type: string
+          description: Month key, e.g. '2024-06'
+        label:
+          type: string
+          description: Human-readable label, e.g. 'Jun 2024'
+        count:
+          type: integer
+      required:
+      - count
+      - label
+      - month
+    PaginatedJobApplicationListList:
+      type: object
+      properties:
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+            total_pages:
+              type: integer
+            current_page:
+              type: integer
+            page_size:
+              type: integer
+            has_next:
+              type: boolean
+            has_previous:
+              type: boolean
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobApplicationList'
+    PaginatedReminderListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReminderList'
+    PaginatedStatusHistoryList:
+      type: object
+      properties:
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+            total_pages:
+              type: integer
+            current_page:
+              type: integer
+            page_size:
+              type: integer
+            has_next:
+              type: boolean
+            has_previous:
+              type: boolean
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatusHistory'
+    PaginatedUserPublicList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserPublic'
+    PatchedJobApplicationWriteRequest:
+      type: object
+      description: |-
+        Handles creation and updates.
+        On status change, automatically writes a StatusHistory entry.
+        User is injected from request.user — never from the payload.
+      properties:
+        company_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        job_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        job_url:
+          type: string
+          format: uri
+          title: Job posting URL
+          maxLength: 200
+        location:
+          type: string
+          maxLength: 200
+        work_mode:
+          oneOf:
+          - $ref: '#/components/schemas/WorkModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        status:
+          $ref: '#/components/schemas/ToStatusEnum'
+        salary_min:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary min (annual)
+        salary_max:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Salary max (annual)
+        salary_currency:
+          type: string
+          minLength: 1
+          title: Currency
+          maxLength: 3
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        source_detail:
+          type: string
+          description: E.g. referrer name, recruiter company, specific job board.
+          maxLength: 200
+        applied_date:
+          type: string
+          format: date
+          nullable: true
+          title: Date applied
+        interview_date:
+          type: string
+          format: date-time
+          nullable: true
+          title: Interview date/time
+        offer_deadline:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+    PatchedReminderWriteRequest:
+      type: object
+      description: |-
+        Handles reminder creation and updates.
+
+        Validates:
+        - remind_at must be in the future (on create)
+        - application must belong to the requesting user
+        - cannot edit a reminder that has already been sent
+      properties:
+        application:
+          type: string
+          format: uuid
+        reminder_type:
+          $ref: '#/components/schemas/ReminderTypeEnum'
+        remind_at:
+          type: string
+          format: date-time
+          description: Exact date and time to send the reminder email (UTC).
+        message:
+          type: string
+          description: Optional note to include in the reminder email.
+        is_active:
+          type: boolean
+          title: Active
+          description: Uncheck to cancel this reminder without deleting it.
+    PatchedUserProfileRequest:
+      type: object
+      description: |-
+        Full profile for the authenticated user's own account.
+        Readable + writable (except id, email, role, date_joined).
+        Email changes are handled separately to allow re-verification in future.
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        bio:
+          type: string
+        location:
+          type: string
+          maxLength: 150
+        website:
+          type: string
+          format: uri
+          maxLength: 200
+        avatar:
+          type: string
+          format: binary
+          nullable: true
+    Register:
+      type: object
+      description: |-
+        Handles new user sign-up.
+        Requires password + password_confirm that must match.
+        Returns the created user (without exposing the password hash).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+      required:
+      - email
+      - first_name
+      - id
+      - last_name
+    RegisterRequest:
+      type: object
+      description: |-
+        Handles new user sign-up.
+        Requires password + password_confirm that must match.
+        Returns the created user (without exposing the password hash).
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          title: Email address
+          maxLength: 254
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 1
+          title: Confirm password
+      required:
+      - email
+      - first_name
+      - last_name
+      - password
+      - password_confirm
+    ReminderDetail:
+      type: object
+      description: Full detail with nested application summary.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        application:
+          type: string
+          format: uuid
+          readOnly: true
+        company_name:
+          type: string
+          readOnly: true
+        job_title:
+          type: string
+          readOnly: true
+        reminder_type:
+          allOf:
+          - $ref: '#/components/schemas/ReminderTypeEnum'
+          readOnly: true
+        reminder_type_display:
+          type: string
+          readOnly: true
+        remind_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Exact date and time to send the reminder email (UTC).
+        message:
+          type: string
+          readOnly: true
+          description: Optional note to include in the reminder email.
+        is_sent:
+          type: boolean
+          readOnly: true
+          title: Sent
+        sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: Active
+          description: Uncheck to cancel this reminder without deleting it.
+        is_due:
+          type: boolean
+          readOnly: true
+        is_overdue:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        application_detail:
+          allOf:
+          - $ref: '#/components/schemas/JobApplicationList'
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - application
+      - application_detail
+      - company_name
+      - created_at
+      - id
+      - is_active
+      - is_due
+      - is_overdue
+      - is_sent
+      - job_title
+      - message
+      - remind_at
+      - reminder_type
+      - reminder_type_display
+      - sent_at
+      - updated_at
+    ReminderList:
+      type: object
+      description: Compact read-only representation for list views.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        application:
+          type: string
+          format: uuid
+          readOnly: true
+        company_name:
+          type: string
+          readOnly: true
+        job_title:
+          type: string
+          readOnly: true
+        reminder_type:
+          allOf:
+          - $ref: '#/components/schemas/ReminderTypeEnum'
+          readOnly: true
+        reminder_type_display:
+          type: string
+          readOnly: true
+        remind_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Exact date and time to send the reminder email (UTC).
+        message:
+          type: string
+          readOnly: true
+          description: Optional note to include in the reminder email.
+        is_sent:
+          type: boolean
+          readOnly: true
+          title: Sent
+        sent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: Active
+          description: Uncheck to cancel this reminder without deleting it.
+        is_due:
+          type: boolean
+          readOnly: true
+        is_overdue:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - application
+      - company_name
+      - created_at
+      - id
+      - is_active
+      - is_due
+      - is_overdue
+      - is_sent
+      - job_title
+      - message
+      - remind_at
+      - reminder_type
+      - reminder_type_display
+      - sent_at
+    ReminderTypeEnum:
+      enum:
+      - follow_up
+      - interview_prep
+      - deadline
+      - general
+      type: string
+      description: |-
+        * `follow_up` - Follow Up
+        * `interview_prep` - Interview Prep
+        * `deadline` - Deadline
+        * `general` - General
+    ReminderWrite:
+      type: object
+      description: |-
+        Handles reminder creation and updates.
+
+        Validates:
+        - remind_at must be in the future (on create)
+        - application must belong to the requesting user
+        - cannot edit a reminder that has already been sent
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        application:
+          type: string
+          format: uuid
+        reminder_type:
+          $ref: '#/components/schemas/ReminderTypeEnum'
+        remind_at:
+          type: string
+          format: date-time
+          description: Exact date and time to send the reminder email (UTC).
+        message:
+          type: string
+          description: Optional note to include in the reminder email.
+        is_active:
+          type: boolean
+          title: Active
+          description: Uncheck to cancel this reminder without deleting it.
+      required:
+      - application
+      - id
+      - remind_at
+    ReminderWriteRequest:
+      type: object
+      description: |-
+        Handles reminder creation and updates.
+
+        Validates:
+        - remind_at must be in the future (on create)
+        - application must belong to the requesting user
+        - cannot edit a reminder that has already been sent
+      properties:
+        application:
+          type: string
+          format: uuid
+        reminder_type:
+          $ref: '#/components/schemas/ReminderTypeEnum'
+        remind_at:
+          type: string
+          format: date-time
+          description: Exact date and time to send the reminder email (UTC).
+        message:
+          type: string
+          description: Optional note to include in the reminder email.
+        is_active:
+          type: boolean
+          title: Active
+          description: Uncheck to cancel this reminder without deleting it.
+      required:
+      - application
+      - remind_at
+    ResponseRate:
+      type: object
+      properties:
+        total:
+          type: integer
+        responded:
+          type: integer
+        response_rate:
+          type: number
+          format: double
+          description: '% of applications that moved past ''applied'''
+        interview_rate:
+          type: number
+          format: double
+          description: '% of applications that reached interview'
+        offer_rate:
+          type: number
+          format: double
+          description: '% of applications that received an offer'
+      required:
+      - interview_rate
+      - offer_rate
+      - responded
+      - response_rate
+      - total
+    RoleEnum:
+      enum:
+      - job_seeker
+      - admin
+      type: string
+      description: |-
+        * `job_seeker` - Job Seeker
+        * `admin` - Admin
+    SourceBreakdownItem:
+      type: object
+      properties:
+        source:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+      required:
+      - count
+      - label
+      - source
+    SourceEnum:
+      enum:
+      - linkedin
+      - indeed
+      - company
+      - referral
+      - recruiter
+      - job_board
+      - other
+      type: string
+      description: |-
+        * `linkedin` - LinkedIn
+        * `indeed` - Indeed
+        * `company` - Company Website
+        * `referral` - Referral
+        * `recruiter` - Recruiter
+        * `job_board` - Job Board
+        * `other` - Other
+    StageDurationItem:
+      type: object
+      properties:
+        from_stage:
+          type: string
+        to_stage:
+          type: string
+        label:
+          type: string
+          description: e.g. 'Applied → Screening'
+        avg_days:
+          type: number
+          format: double
+        sample_size:
+          type: integer
+          description: Number of transitions this average is based on
+      required:
+      - avg_days
+      - from_stage
+      - label
+      - sample_size
+      - to_stage
+    StatusBreakdownItem:
+      type: object
+      properties:
+        status:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+      required:
+      - count
+      - label
+      - status
+    StatusHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        from_status:
+          allOf:
+          - $ref: '#/components/schemas/ToStatusEnum'
+          readOnly: true
+        from_status_display:
+          type: string
+          readOnly: true
+        to_status:
+          allOf:
+          - $ref: '#/components/schemas/ToStatusEnum'
+          readOnly: true
+        to_status_display:
+          type: string
+          readOnly: true
+        changed_at:
+          type: string
+          format: date-time
+          readOnly: true
+        note:
+          type: string
+          readOnly: true
+          description: Optional note about why the status changed.
+      required:
+      - changed_at
+      - from_status
+      - from_status_display
+      - id
+      - note
+      - to_status
+      - to_status_display
+    ToStatusEnum:
+      enum:
+      - saved
+      - applied
+      - screening
+      - interview
+      - offer
+      - accepted
+      - rejected
+      - withdrawn
+      type: string
+      description: |-
+        * `saved` - Saved
+        * `applied` - Applied
+        * `screening` - Screening
+        * `interview` - Interview
+        * `offer` - Offer
+        * `accepted` - Accepted
+        * `rejected` - Rejected
+        * `withdrawn` - Withdrawn
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TopCompany:
+      type: object
+      properties:
+        company_name:
+          type: string
+        count:
+          type: integer
+      required:
+      - company_name
+      - count
+    UserProfile:
+      type: object
+      description: |-
+        Full profile for the authenticated user's own account.
+        Readable + writable (except id, email, role, date_joined).
+        Email changes are handled separately to allow re-verification in future.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+        full_name:
+          type: string
+          readOnly: true
+        role:
+          type: string
+          readOnly: true
+        bio:
+          type: string
+        location:
+          type: string
+          maxLength: 150
+        website:
+          type: string
+          format: uri
+          maxLength: 200
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        application_count:
+          type: string
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+        last_login:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - application_count
+      - date_joined
+      - email
+      - first_name
+      - full_name
+      - id
+      - last_login
+      - last_name
+      - role
+    UserProfileRequest:
+      type: object
+      description: |-
+        Full profile for the authenticated user's own account.
+        Readable + writable (except id, email, role, date_joined).
+        Email changes are handled separately to allow re-verification in future.
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        bio:
+          type: string
+        location:
+          type: string
+          maxLength: 150
+        website:
+          type: string
+          format: uri
+          maxLength: 200
+        avatar:
+          type: string
+          format: binary
+          nullable: true
+      required:
+      - first_name
+      - last_name
+    UserPublic:
+      type: object
+      description: |-
+        Minimal read-only representation — safe for admin user listings.
+        Does not expose email or personal details of other users.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        avatar:
+          type: string
+          format: uri
+          readOnly: true
+          nullable: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - avatar
+      - date_joined
+      - full_name
+      - id
+      - role
+    WeeklyVolumeItem:
+      type: object
+      properties:
+        week:
+          type: string
+          description: ISO week label, e.g. '2024-W22'
+        count:
+          type: integer
+      required:
+      - count
+      - week
+    WorkModeEnum:
+      enum:
+      - remote
+      - hybrid
+      - on_site
+      type: string
+      description: |-
+        * `remote` - Remote
+        * `hybrid` - Hybrid
+        * `on_site` - On-site
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+- name: auth
+  description: Authentication and account management
+- name: applications
+  description: Job application CRUD and pipeline
+- name: reminders
+  description: Email reminder scheduling
+- name: analytics
+  description: Dashboard and application analytics

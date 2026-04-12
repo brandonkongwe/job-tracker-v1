@@ -54,6 +54,8 @@ class JobApplicationFilter(django_filters.FilterSet):
     )
 
     def filter_is_active(self, queryset, name, value):
+        if value is None:
+            return queryset
         terminal = [
             JobApplication.Status.ACCEPTED,
             JobApplication.Status.REJECTED,

@@ -1,8 +1,9 @@
-# Job Application Tracker API
+# Job Application Tracker
 
-A REST API for tracking job applications, managing CV uploads, scheduling email reminders, and analysing your job search with dashboard analytics.
+A full-stack job application tracking system with a Django REST API backend and a React frontend.
 
-Built with **Django 6** · **Django REST Framework** · **PostgreSQL** · **Celery** 
+**Backend:** Django 6 · Django REST Framework · PostgreSQL · Celery  
+**Frontend:** React 19 · TypeScript · Vite · TanStack Query · Tailwind CSS
 
 ---
 
@@ -13,6 +14,7 @@ Built with **Django 6** · **Django REST Framework** · **PostgreSQL** · **Cele
 - [Project Structure](#project-structure)
 - [Quick Start — Docker](#quick-start--docker-recommended)
 - [Quick Start — Local](#quick-start--local-virtualenv)
+- [Frontend Setup](#frontend-setup)
 - [Environment Variables](#environment-variables)
 - [Running the Services](#running-the-services)
 - [API Reference](#api-reference)
@@ -28,7 +30,7 @@ Built with **Django 6** · **Django REST Framework** · **PostgreSQL** · **Cele
 |---|---|
 | **Authentication** | JWT (access + refresh tokens), token blacklist on logout |
 | **Role-based access** | `job_seeker` (default) and `admin` roles |
-| **Job application CRUD** | Full pipeline: Saved => Applied => Screening => Interview => Offer => Accepted/Rejected/Withdrawn |
+| **Job application CRUD** | Full pipeline: Saved → Applied → Screening → Interview → Offer → Accepted/Rejected/Withdrawn |
 | **Status history** | Immutable audit log of every status transition |
 | **CV / document upload** | PDF, DOC, DOCX — validated extension + size (5 MB limit) |
 | **Email reminders** | Scheduled via Celery Beat, fired per-minute, double-send protected |
@@ -41,6 +43,23 @@ Built with **Django 6** · **Django REST Framework** · **PostgreSQL** · **Cele
 ---
 
 ## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│           React Frontend (port 3000)             │
+│  Dashboard · Applications · Reminders · Auth     │
+└──────────────────────┬──────────────────────────┘
+                       │ HTTP / JSON (Vite proxy in dev)
+┌──────────────────────▼──────────────────────────┐
+│         Django REST Framework (port 8000)        │
+│  accounts / applications / reminders / analytics │
+└──────┬──────────────┬────────────────────────────┘
+       │              │
+┌──────▼──────┐ ┌─────▼──────────────────────────┐
+│  PostgreSQL  │ │   Celery Worker + Beat          │
+│  (port 5432) │ │   (Redis broker, port 6379)     │
+└─────────────┘ └────────────────────────────────┘
+```
 
 **4 Django apps, each owning a bounded domain:**
 
@@ -55,7 +74,7 @@ Built with **Django 6** · **Django REST Framework** · **PostgreSQL** · **Cele
 
 ```
 jobtracker/
-├── jobtracker/               # Django project package
+├── jobtracker/                # Django project package
 │   ├── settings/
 │   │   ├── base.py            # Shared settings
 │   │   ├── dev.py             # Development overrides
@@ -84,6 +103,36 @@ jobtracker/
 │   ├── base.txt               # Shared dependencies
 │   ├── dev.txt                # + pytest, debug toolbar, ruff
 │   └── prod.txt               # + gunicorn
+│
+├── frontend/                  # React + TypeScript frontend
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── client.ts      # openapi-fetch instance with JWT middleware
+│   │   │   ├── schema.d.ts    # Auto-generated from /api/schema/ (run generate-api)
+│   │   │   └── hooks/         # TanStack Query hooks per resource
+│   │   │       ├── useApplications.ts
+│   │   │       ├── useAnalytics.ts
+│   │   │       └── useAuth.ts
+│   │   ├── components/
+│   │   │   ├── ui/            # Shared UI primitives (Button, Input, Card…)
+│   │   │   ├── applications/  # ApplicationCard, StatusBadge, Filters, CreateDialog
+│   │   │   ├── analytics/     # StatCard, ActivityHeatmap
+│   │   │   └── layout/        # AppShell sidebar, ProtectedRoute
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx  # Analytics overview with Recharts
+│   │   │   ├── Applications.tsx
+│   │   │   ├── ApplicationDetail.tsx
+│   │   │   ├── Reminders.tsx
+│   │   │   ├── Login.tsx
+│   │   │   └── Register.tsx
+│   │   ├── stores/
+│   │   │   └── authStore.ts   # Zustand store — JWT tokens + user, persisted
+│   │   └── lib/
+│   │       ├── utils.ts       # cn(), formatDate(), STATUS_CONFIG…
+│   │       └── useDebounce.ts
+│   ├── vite.config.ts         # Dev proxy: /api → localhost:8000
+│   ├── tailwind.config.ts
+│   └── package.json
 │
 ├── .env.example               # All required environment variables documented
 ├── docker-compose.yml         # Full local dev stack
@@ -129,9 +178,18 @@ This starts:
 docker-compose exec api python manage.py createsuperuser
 ```
 
-### 4. Verify it's working
+### 4. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 5. Verify everything is running
 
 ```
+Frontend:      http://localhost:3000
 API root:      http://localhost:8000/api/v1/
 Swagger docs:  http://localhost:8000/api/docs/
 ReDoc:         http://localhost:8000/api/redoc/
@@ -142,11 +200,10 @@ Django admin:  http://localhost:8000/admin/
 
 ## Quick Start — Local (Virtualenv)
 
-Use this if you prefer running services natively or already have PostgreSQL and Redis installed.
-
 ### 1. Prerequisites
 
 - Python 3.12+
+- Node.js 18+
 - PostgreSQL 14+
 - Redis 7+
 
@@ -165,7 +222,6 @@ pip install -r requirements/dev.txt
 ### 3. Create the database
 
 ```bash
-# Make sure PostgreSQL is running, then:
 createdb job_tracker_db
 ```
 
@@ -178,12 +234,12 @@ cp .env.example .env
 Open `.env` and update:
 
 ```env
-SECRET_KEY=<generated-key>          # python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+SECRET_KEY=<generated-key>
 DATABASE_URL=postgres://postgres:<your-pg-password>@localhost:5432/job_tracker_db
 REDIS_URL=redis://localhost:6379/0
 ```
 
-### 5. Run migrations and start
+### 5. Run migrations and start the API
 
 ```bash
 python manage.py migrate
@@ -195,12 +251,78 @@ python manage.py runserver
 
 ```bash
 # Terminal 2 — Celery worker
-celery -A job_tracker worker -l info -Q default,reminders
+celery -A jobtracker worker -l info -Q default,reminders
 
 # Terminal 3 — Celery Beat scheduler
-celery -A job_tracker beat -l info \
+celery -A jobtracker beat -l info \
   --scheduler django_celery_beat.schedulers:DatabaseScheduler
 ```
+
+---
+
+## Frontend Setup
+
+The frontend lives in the `frontend/` directory and is a standalone Vite + React app.
+
+### Install and run
+
+```bash
+cd frontend
+npm install
+npm run dev
+# → http://localhost:3000
+```
+
+Vite's dev server proxies all `/api` requests to `http://localhost:8000`, so no CORS configuration is needed during development.
+
+### Generate the typed API client
+
+Once the Django server is running, regenerate the TypeScript types from the live OpenAPI schema:
+
+```bash
+npm run generate-api
+# Writes src/api/schema.d.ts
+```
+
+Run this again whenever you add or change backend endpoints.
+
+### Frontend scripts
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Start dev server on port 3000 |
+| `npm run build` | Type-check + production build |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | ESLint across all `.ts` / `.tsx` files |
+| `npm run type-check` | TypeScript check without emitting |
+| `npm run generate-api` | Regenerate `schema.d.ts` from the live API |
+
+### Frontend tech stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + TypeScript |
+| Build tool | Vite 8 |
+| Routing | React Router v7 |
+| Server state | TanStack Query v5 |
+| Client state | Zustand (persisted auth store) |
+| Forms | React Hook Form + Zod |
+| Styling | Tailwind CSS v4 |
+| UI primitives | Radix UI |
+| Charts | Recharts |
+| API client | openapi-fetch + openapi-typescript |
+| Icons | Lucide React |
+
+### Pages
+
+| Route | Page | Description |
+|---|---|---|
+| `/login` | Login | JWT authentication |
+| `/register` | Register | Account creation |
+| `/dashboard` | Dashboard | Analytics overview — charts, funnel, heatmap |
+| `/applications` | Applications | Paginated list with search, filter, sort |
+| `/applications/:id` | Application Detail | Status pipeline, CV upload, history timeline |
+| `/reminders` | Reminders | Scheduled email reminders per application |
 
 ---
 
@@ -229,24 +351,24 @@ All variables are documented in `.env.example`. Key ones:
 ```bash
 python manage.py runserver
 # or with explicit settings module:
-DJANGO_SETTINGS_MODULE=job_tracker.settings.dev python manage.py runserver
+DJANGO_SETTINGS_MODULE=jobtracker.settings.dev python manage.py runserver
 ```
 
 ### Celery worker
 
 ```bash
 # Development — verbose, single worker
-celery -A job_tracker worker -l info -Q default,reminders
+celery -A jobtracker worker -l info -Q default,reminders
 
 # Production — multiple concurrent workers
-celery -A job_tracker worker -l warning -Q default,reminders \
+celery -A jobtracker worker -l warning -Q default,reminders \
   --concurrency=4 --max-tasks-per-child=100
 ```
 
 ### Celery Beat
 
 ```bash
-celery -A job_tracker beat -l info \
+celery -A jobtracker beat -l info \
   --scheduler django_celery_beat.schedulers:DatabaseScheduler
 ```
 
@@ -255,7 +377,6 @@ Beat reads the schedule from the database (managed by `django-celery-beat`). The
 ### Triggering reminders manually (useful in dev)
 
 ```bash
-# Fire the dispatch task immediately (bypasses the scheduler)
 python manage.py shell -c "
 from reminders.tasks import dispatch_due_reminders
 result = dispatch_due_reminders.apply()
@@ -309,7 +430,7 @@ search=<term>               Full-text search (company, title, location, notes)
 status=applied&status=interview   Filter by one or more statuses
 work_mode=remote            Filter by work mode
 is_active=true              Active applications only
-applied_after=2024-01-01    Applied on or after date
+applied_after=2026-01-01    Applied on or after date
 salary_min_gte=50000        Minimum salary at least
 ordering=-created_at        Sort (prefix - for descending)
 page=2&page_size=10         Pagination
@@ -390,7 +511,7 @@ curl -X POST http://localhost:8000/api/v1/reminders/ \
   -d '{
     "application": "<app_id>",
     "reminder_type": "follow_up",
-    "remind_at": "2024-06-22T09:00:00Z",
+    "remind_at": "2026-04-22T09:00:00Z",
     "message": "Send follow-up email to recruiter."
   }'
 
@@ -442,8 +563,11 @@ python manage.py migrate
 # Create a superuser
 python manage.py createsuperuser
 
-# Generate OpenAPI schema to a file (useful for frontend codegen)
+# Generate OpenAPI schema to a file
 python manage.py spectacular --file schema.yml
+
+# Regenerate frontend TypeScript types from the live schema
+cd frontend && npm run generate-api
 
 # Check for missing migrations
 python manage.py makemigrations --check
@@ -471,21 +595,27 @@ ruff check .
 black .
 
 # Run Docker services individually
-docker-compose up db redis          # Infrastructure only
-docker-compose up api               # API only (requires db + redis)
+docker-compose up db redis            # Infrastructure only
+docker-compose up api                 # API only (requires db + redis)
 docker-compose logs -f celery_worker  # Tail worker logs
-docker-compose exec api bash        # Shell into the API container
+docker-compose exec api bash          # Shell into the API container
+
+# Frontend
+cd frontend && npm run build          # Production build
+cd frontend && npm run type-check     # TypeScript check only
 ```
 
 ---
 
 ## Tech Stack
 
+### Backend
+
 | Layer | Technology |
 |---|---|
 | Language | Python 3.12 |
 | Framework | Django 6.0, Django REST Framework 3.17 |
-| Database | PostgreSQL 16 |
+| Database | PostgreSQL 18 |
 | Auth | JWT via `djangorestframework-simplejwt` |
 | Task queue | Celery 5.6, Redis 7 |
 | Scheduling | `django-celery-beat` |
@@ -496,3 +626,20 @@ docker-compose exec api bash        # Shell into the API container
 | Production server | Gunicorn |
 | Static files | Whitenoise |
 | Containerisation | Docker, Docker Compose |
+
+### Frontend
+
+| Layer | Technology |
+|---|---|
+| Language | TypeScript 5 |
+| Framework | React 18 |
+| Build tool | Vite 5 |
+| Routing | React Router v6 |
+| Server state | TanStack Query v5 |
+| Client state | Zustand |
+| Forms | React Hook Form + Zod |
+| Styling | Tailwind CSS v3 |
+| UI primitives | Radix UI |
+| Charts | Recharts |
+| API client | openapi-fetch + openapi-typescript |
+| Icons | Lucide React |
